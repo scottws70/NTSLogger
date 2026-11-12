@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NTS Traffic Logger</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">NTS Traffic Logger<span class="call" id="hdr-call"></span></div>
+    <nav class="tabs" id="tabs">
+      <button data-view="dashboard" class="active">Dashboard</button>
+      <button data-view="entry">Enter Traffic</button>
+      <button data-view="log">Log</button>
+      <button data-view="reports">Reports</button>
+      <button data-view="settings">Settings</button>
+    </nav>
+    <div class="top-clock" id="top-clock"></div>
+  </header>
+
+  <main>
+    <!-- DASHBOARD -->
+    <section class="view active" id="view-dashboard">
+      <div class="grid-dash">
+        <div class="panel">
+          <div class="today-date" id="dash-date"></div>
+          <div class="clock-row">
+            <div><div class="lbl">Local</div><div class="val" id="dash-local"></div><div class="sub" id="dash-local-tz"></div></div>
+            <div><div class="lbl">UTC</div><div class="val" id="dash-utc"></div><div class="sub" id="dash-utc-date"></div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Upcoming Nets</h2><span class="spacer"></span><button class="btn sm" data-goto="settings" data-anchor="nets-anchor">Edit nets</button></div>
+          <ul class="net-list" id="dash-nets"></ul>
+        </div>
+      </div>
+      <div class="tiles" id="dash-tiles"></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Traffic Waiting</h2>
+          <span class="spacer"></span>
+          <input type="search" id="wait-search" placeholder="Filter…" style="width:160px">
+          <button class="btn sm" id="wait-selall">Select all</button>
+          <button class="btn sm primary" id="wait-relay" disabled>Relay selected…</button>
+          <button class="btn sm primary" id="wait-deliver" disabled>Deliver selected…</button>
+          <button class="btn sm" id="wait-service" disabled>Undeliverable…</button>
+        </div>
+        <div id="wait-list"></div>
+      </div>
+    </section>
+
+    <!-- ENTRY -->
+    <section class="view" id="view-entry">
+      <div class="subtabs" id="entry-tabs">
+        <button data-sub="paste" class="active">Paste a list of messages</button>
+        <button data-sub="single">Single radiogram</button>
+      </div>
+
+      <div id="entry-paste">
+        <div class="panel">
+          <div class="panel-head"><h2>Paste traffic</h2><span class="spacer"></span><span class="muted small">Any mix of one-line or multi-line radiograms, separate or in book form</span></div>
+          <textarea class="paste up" id="paste-text" spellcheck="false" placeholder="NR 123 R HXG W1AW 15 NEWINGTON CT 1830Z NOV 10&#10;JOHN SMITH&#10;123 MAIN ST&#10;COLUMBUS OH 43215&#10;614 555 1212&#10;BT&#10;HAPPY BIRTHDAY X HOPE YOU HAVE&#10;A GREAT DAY X 73&#10;BT&#10;JANE DOE&#10;AR"></textarea>
+          <fieldset style="margin-top:12px">
+            <legend>Where this traffic came from</legend>
+            <div class="radio-row" style="margin-bottom:10px">
+              <label><input type="radio" name="paste-origin" value="received" checked> Received from another station</label>
+              <label><input type="radio" name="paste-origin" value="originated"> I originated these</label>
+            </div>
+            <div class="form-grid" id="paste-recv">
+              <label class="f c3">Received from (callsign)<input class="up" id="paste-from" list="dl-stations" autocomplete="off"></label>
+              <label class="f c4">Net<input id="paste-net" list="dl-nets" autocomplete="off"></label>
+              <div class="c5"><label class="f">Received (UTC date / time)</label><div id="paste-utc"></div></div>
+            </div>
+          </fieldset>
+          <div class="btn-row">
+            <button class="btn primary" id="paste-parse">Sort &amp; preview</button>
+            <button class="btn" id="paste-clear">Clear</button>
+          </div>
+        </div>
+        <div class="panel hidden" id="paste-preview"></div>
+      </div>
+
+      <div id="entry-single" class="hidden">
+        <div class="panel" id="single-form-host"></div>
+      </div>
+    </section>
+
+    <!-- LOG -->
+    <section class="view" id="view-log">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Message Log</h2>
+          <span class="spacer"></span>
+          <select id="log-status">
+            <option value="closed">Relayed, delivered &amp; undeliverable</option>
+            <option value="relayed">Relayed only</option>
+            <option value="delivered">Delivered only</option>
+            <option value="serviced">Undeliverable only</option>
+            <option value="waiting">Still waiting</option>
+            <option value="all">Everything</option>
+          </select>
+          <label class="inline small muted">From <input type="date" id="log-from"></label>
+          <label class="inline small muted">To <input type="date" id="log-to"></label>
+          <input type="search" id="log-search" placeholder="Search…" style="width:160px">
+          <button class="btn sm" id="log-csv">Export CSV</button>
+        </div>
+        <div class="table-wrap" id="log-table"></div>
+      </div>
+    </section>
+
+    <!-- REPORTS -->
+    <section class="view" id="view-reports">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Traffic Report</h2>
+          <span class="spacer"></span>
+          <select id="rep-period">
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="week">This week</option>
+            <option value="month" selected>This month</option>
+            <option value="lastmonth">Last month</option>
+            <option value="year">This year</option>
+            <option value="all">All time</option>
+            <option value="custom">Custom…</option>
+          </select>
+          <span id="rep-custom" class="inline hidden">
+            <input type="date" id="rep-from"> to <input type="date" id="rep-to">
+          </span>
+          <button class="btn sm" id="rep-copy">Copy summary</button>
+          <button class="btn sm" id="rep-csv">Export CSV</button>
+        </div>
+        <div id="rep-body"></div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="view" id="view-settings">
+      <div class="panel">
+        <h2 style="margin-bottom:12px">My Station</h2>
+        <div class="form-grid">
+          <label class="f c3">My callsign<input class="up" id="set-call"></label>
+          <label class="f c3">Name<input id="set-name"></label>
+          <label class="f c4">City (place of origin)<input class="up" id="set-city"></label>
+          <label class="f c2">State<input class="up" id="set-state" maxlength="2"></label>
+          <label class="f c3">Next message number<input type="number" min="1" id="set-nextnr"></label>
+        </div>
+      </div>
+      <div class="panel">
+        <h2 style="margin-bottom:4px">My Delivery Area</h2>
+        <p class="muted small" style="margin:0 0 10px">Traffic addressed inside this area is sorted under <b>Deliver</b>; everything else is sorted under <b>Relay</b>, grouped by state.</p>
+        <div class="form-grid">
+          <label class="f c6">ZIP codes or ZIP prefixes (comma separated)<input id="set-zips" placeholder="430, 431, 432, 43701"></label>
+          <label class="f c6">Cities (comma separated, CITY ST)<input class="up" id="set-cities" placeholder="COLUMBUS OH, DUBLIN OH"></label>
+        </div>
+      </div>
+      <div class="panel" id="nets-anchor">
+        <div class="panel-head"><h2>My Nets</h2><span class="spacer"></span><button class="btn sm" id="net-add">+ Add net</button></div>
+        <div class="table-wrap"><table class="t nets-table" id="nets-table"></table></div>
+        <p class="hint">These show on the Dashboard as upcoming nets and fill the Net choices when you log traffic.</p>
+      </div>
+      <div class="panel">
+        <h2 style="margin-bottom:12px">Preferences</h2>
+        <div class="form-grid">
+          <label class="f c3">Theme<select id="set-theme"><option value="auto">Match system</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+          <label class="f c3">Days and reports use<select id="set-day"><option value="local">Local day</option><option value="utc">UTC day</option></select></label>
+          <label class="f c3">Flag waiting traffic older than (hours)<input type="number" min="1" id="set-overdue"></label>
+          <label class="f c3">Clock<select id="set-clock"><option value="24">24-hour</option><option value="12">12-hour</option></select></label>
+        </div>
+      </div>
+      <div class="panel">
+        <h2 style="margin-bottom:6px">Backup &amp; Restore</h2>
+        <p class="muted small" style="margin:0 0 10px">Everything is stored on this computer. Save a backup now and then, and before moving to a new computer.</p>
+        <div class="btn-row">
+          <button class="btn" id="bk-save">Save backup…</button>
+          <button class="btn" id="bk-load">Restore from backup…</button>
+          <input type="file" id="bk-file" accept=".json,application/json" class="hidden">
+          <span class="muted small" id="bk-info"></span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <datalist id="dl-stations"></datalist>
+  <datalist id="dl-nets"></datalist>
+  <div id="modal-root"></div>
+  <div id="toast"></div>
+
+  <script src="parser.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
