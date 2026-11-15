@@ -24,7 +24,8 @@
   const NRPFX = '(?:NR\\.?|NUMBER:?|MSG|NO\\.|#)?\\s*';
 
   const START_RE = new RegExp('^\\s*' + NRPFX + '(\\d{1,5})[\\s,]+(?:(TEST)\\s+)?' + PREC + '[\\s,]+' + HX + STATION + '[\\s,]+' + CHECK + '[\\s,]*(.*)$');
-  const BOOK_PRE_RE = new RegExp('^\\s*(?:(TEST)\\s+)?' + PREC + '[\\s,]+' + HX + STATION + '[\\s,]+' + CHECK + '[\\s,]*(.*)$');
+  // In a book header, precedence, HX and station of origin are optional: any of them may vary per message.
+  const BOOK_PRE_RE = new RegExp('^\\s*(?:(TEST)\\s+)?(?:' + PREC + '[\\s,]+)?' + HX + '(?:' + STATION + '[\\s,]+)?' + CHECK + '[\\s,]*(.*)$');
   const BOOK_RE = /^\s*BOOK\s+(?:OF\s+)?(\d{1,3})\b[\s,]*(.*)$/;
   const VAR_RE = /^\s*(?:NR\.?|NUMBER:?|#)\s*(\d{1,5})\b[\s,]*(.*)$/;
   const END_LINE_RE = /^\s*(AR|NNNN|EOM|END|SK|AR\s+K|AR\s+SK|\+|#+|-{3,}|={3,}|\*{3,})\s*$/;
@@ -346,6 +347,42 @@
     return finalize(msg, warnings);
   }
 
+  const HX_TOK_RE = /^HX[A-G]\d*$/;
+  const PREC_TOK_RE = /^(EMERGENCY|PRIORITY|ROUTINE|WELFARE|R|P|W)$/;
+  function isCallTok(t) {
+    return /^[A-Z0-9\/]+$/.test(t) && /\d/.test(t) && /[A-Z]/.test(t) && !/^\d+(ST|ND|RD|TH)$/.test(t);
+  }
+
+  /**
+   * Read the preamble parts that differ between book messages from the start of an
+   * "NR n ..." line: precedence, HX, station of origin, time filed, date — in that order.
+   * Stops at the first word that isn't one of those, which begins the address.
+   */
+  function parseVarPreamble(rest) {
+    const toks = String(rest || '').trim().split(/\s+/).filter(Boolean);
+    const own = {};
+    let i = 0;
+    const isPre = t => t && (HX_TOK_RE.test(t) || isCallTok(t) || TIME_RE.test(t));
+    if (toks[i] && PREC_TOK_RE.test(toks[i]) && (toks.length === i + 1 || isPre(toks[i + 1]))) { own.prec = PREC_MAP[toks[i]]; i++; }
+    const hx = [];
+    while (toks[i] && HX_TOK_RE.test(toks[i])) {
+      hx.push(toks[i++]);
+      if (toks[i] && /^\d{1,3}$/.test(toks[i])) hx.push(toks[i++]);
+    }
+    if (hx.length) own.hx = hx.join(' ');
+    if (toks[i] && isCallTok(toks[i]) && !TIME_RE.test(toks[i])) own.station = toks[i++];
+    let tail = toks.slice(i).join(' ');
+    const lead = DATE_RE.exec(tail);
+    const tm = /^(\S+)(?:\s+(Z|L|UTC|GMT))?\s*/.exec(tail);
+    if (tm && TIME_RE.test(tm[1] + (tm[2] || '')) && (/[A-Z]$/.test(tm[1] + (tm[2] || '')) || (lead && lead.index === tm[0].length))) {
+      own.time = tm[1] + (tm[2] || '');
+      tail = tail.slice(tm[0].length);
+    }
+    const dm = DATE_RE.exec(tail);
+    if (dm && dm.index === 0) { own.date = dateFromMatch(dm); tail = tail.slice(dm[0].length); }
+    return { own, rest: tail.replace(/^[\s,]+/, '') };
+  }
+
   function parseBookBlock(lines) {
     const hm = BOOK_RE.exec(lines[0]);
     const count = parseInt(hm[1], 10);
@@ -356,8 +393,8 @@
     if (pm) {
       base.test = !!pm[1];
       base.prec = PREC_MAP[pm[2]] || 'R';
-      base.hx = squash(pm[3].replace(/,/g, ' '));
-      base.station = pm[4];
+      base.hx = squash((pm[3] || '').replace(/,/g, ' '));
+      base.station = pm[4] || '';
       base.check = normCheck(pm[5]);
       const ptd = parsePlaceTimeDate(pm[6] || '');
       base.place = ptd.place; base.time = ptd.time; base.date = ptd.date;
@@ -378,7 +415,11 @@
         continue;
       }
       const vm = VAR_RE.exec(line);
-      if (vm) { vars.push({ nr: String(parseInt(vm[1], 10)), lines: [vm[2]] }); continue; }
+      if (vm) {
+        const vp = parseVarPreamble(vm[2]);
+        vars.push({ nr: String(parseInt(vm[1], 10)), lines: [vp.rest], own: vp.own });
+        continue;
+      }
       if (vars.length) vars[vars.length - 1].lines.push(line);
       else common.push(line);
     }
@@ -508,19 +549,48 @@
     return out.join('\n');
   }
 
-  /** Messages are bookable when everything except the number and address is the same. */
+  /**
+   * Messages can be booked when the check, place of origin, text and signature match
+   * (grouping by the way they're going is done by the caller). Precedence, HX, station
+   * of origin, time and date may differ; those go on each message's NR line.
+   */
   function bookKey(m) {
-    return [m.test ? 'T' : '', m.prec, m.hx, m.station, normCheck(m.check), m.place, m.time, m.date, squash(m.text), squash(m.sig)].join('|');
+    return [m.test ? 'T' : '', normCheck(m.check), squash(m.place), squash(m.text), squash(m.sig)].join('|');
+  }
+
+  const VAR_FIELDS = ['prec', 'hx', 'station', 'time', 'date'];
+  function varValue(m, k) { return k === 'prec' ? precLabel(m.prec) : squash(m[k]); }
+
+  /** Which of precedence / HX / station / time / date differ between the messages of a book. */
+  function bookVarying(msgs) {
+    return VAR_FIELDS.filter(k => new Set(msgs.map(m => varValue(m, k))).size > 1);
+  }
+
+  /** The shared part of a book's preamble: only the fields that are the same for every message. */
+  function bookCommon(msgs) {
+    const f = msgs[0], vary = new Set(bookVarying(msgs));
+    const parts = [];
+    if (f.test) parts.push('TEST');
+    ['prec', 'hx', 'station'].forEach(k => { if (!vary.has(k)) parts.push(varValue(f, k)); });
+    parts.push(normCheck(f.check), f.place);
+    ['time', 'date'].forEach(k => { if (!vary.has(k)) parts.push(varValue(f, k)); });
+    return parts.filter(Boolean).join(' ');
+  }
+
+  /** A book message's own NR line: its number plus whichever preamble fields vary. */
+  function bookNrLine(m, varying) {
+    return ['NR ' + m.nr].concat(varying.map(k => varValue(m, k))).filter(Boolean).join(' ');
   }
 
   function formatBook(msgs) {
     const f = msgs[0];
-    const out = ['BOOK OF ' + msgs.length + ' ' + preambleLine(f, { noNumber: true }), 'BT'];
+    const varying = bookVarying(msgs);
+    const out = ['BOOK OF ' + msgs.length + ' ' + bookCommon(msgs), 'BT'];
     textLines(f.text).forEach(l => out.push(l));
     out.push('BT');
     String(f.sig || '').split('\n').forEach(l => l && out.push(l));
     msgs.forEach(m => {
-      out.push('NR ' + m.nr);
+      out.push(bookNrLine(m, varying));
       addressLines(m.to).forEach(l => out.push(l));
       if (m.opNote) out.push('OP NOTE ' + m.opNote);
     });
@@ -530,6 +600,7 @@
 
   const API = {
     parseTraffic, computeCheck, normCheck, formatRadiogram, formatBook, bookKey, preambleLine,
+    bookVarying, bookCommon, bookNrLine,
     addressLines, textLines, textWords, parseAddress, PREC_RANK, MONTHS, STATES, precLabel
   };
   root.NTS = API;

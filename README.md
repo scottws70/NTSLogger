@@ -20,7 +20,7 @@ Everything is stored on your own computer. No internet connection is needed.
   - **Deliver — my area**
   - **Relay — OH**, **Relay — PA**, … one group per destination state
   - Inside each group, messages are sorted by precedence (Emergency, Priority, Welfare, Routine), then ZIP code.
-  - Messages in the same group that share the same preamble, text, and signature (only the number and address differ) are shown together as a **BOOK OF n**.
+  - Messages in the same group with the same **check**, **place of origin**, **text**, and **signature** are shown together as a **BOOK OF n**. Their precedence, HX, station of origin, time, and date may differ. Whatever is the same for all of them goes in the book's header, and whatever differs goes on each message's own NR line.
 
 Each row shows the precedence, number, addressee, destination, phone, where it came from, and how long it has been waiting. Click a row to see the whole radiogram.
 
@@ -34,17 +34,22 @@ A relay records the station you passed it to, the net, and the UTC date and time
 **Copy as book** on a book puts the traffic on the clipboard in book form, ready to read or send:
 
 ```
-BOOK OF 2 R N8VCL ARL 8 TOLEDO OH NOV 10
+BOOK OF 2 R 8 HARTFORD CT
 BT
-ARL FIFTY ARL SIXTY ONE
-CONGRATULATIONS X 73
+HAPPY THANKSGIVING FROM ALL OF
+US X 73
 BT
-SALLY KD8ZZZ
-NR 7
-BOB BROWN
-...
+NEW ENGLAND TRAFFIC NET
+NR 101 K1NXT NOV 10
+AL ADAMS
+AKRON OH 44301
+NR 57 KN1OBI NOV 12
+BETTY BAKER
+CANTON OH 44702
 AR
 ```
+
+Here the two messages came from different stations on different dates, so the station and date are on each NR line. When everything in the preamble matches, the NR line is just the number.
 
 ## Enter Traffic
 
@@ -54,7 +59,7 @@ Paste any number of radiograms into the box. They can be:
 
 - one field per line, the standard way,
 - run together on one line (`NR 45 P KD8ABC 7 DAYTON OH 1200 NOV 9 MARY JONES 45 ELM AVE ... BT ... BT BILL AR`),
-- already in book form (`BOOK OF 3 R HXG W3XYZ 9 HARRISBURG PA 0900Z NOV 11` followed by the text and `NR 101`, `NR 102`, … with their addresses), or
+- already in book form (`BOOK OF 3 R HXG W3XYZ 9 HARRISBURG PA 0900Z NOV 11` followed by the text and `NR 101`, `NR 102`, … with their addresses; NR lines can carry their own station, time, or date, like `NR 57 KN1OBI NOV 12`), or
 - any mix of these, in upper or lower case, with net chatter or headers in between.
 
 Then fill in **Received from**, **Net**, and the **UTC date/time** (or choose **I originated these**) and click **Sort & preview**.

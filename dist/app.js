@@ -689,7 +689,7 @@ function renderTiles() {
     tile(c.rcvd, 'Received today') + tile(c.sent, 'Relayed today') + tile(c.dlvd, 'Delivered today') + tile(c.orig, 'Originated today');
 }
 
-function rowHtml(m) {
+function rowHtml(m, nrLine) {
   const h = hoursWaiting(m);
   const over = h >= S.settings.overdueHours;
   return `<div class="msg-row" data-id="${m.id}">
@@ -698,7 +698,7 @@ function rowHtml(m) {
     <span class="nr">${esc(m.nr)}</span>
     <div class="dest">
       <div class="who">${esc(m.to.name || '(no name)')}${m.to.phone ? ' <span class="muted small mono">' + esc(m.to.phone) + '</span>' : ''}${m.checkMismatch ? ' <span class="badge warn">check?</span>' : ''}${m.test ? ' <span class="badge">TEST</span>' : ''}</div>
-      <div class="where">${esc(destText(m) || 'no city / state')} · ${esc(m.station)} ${esc(m.place)} · ${esc(sourceText(m))}</div>
+      <div class="where">${nrLine ? '<span class="mono">' + esc(nrLine) + '</span> · ' : ''}${esc(destText(m) || 'no city / state')} · ${nrLine ? '' : esc(m.station) + ' ' + esc(m.place) + ' · '}${esc(sourceText(m))}</div>
     </div>
     <div class="acts"><span class="badge ${over ? 'bad' : ''}" title="Time waiting">${ageText(h)}</span>
       <button class="btn sm" data-act="relay">Relay</button><button class="btn sm" data-act="deliver">Deliver</button></div>
@@ -725,14 +725,15 @@ function renderWaiting() {
 function bookHtml(members, route) {
   const f = members[0];
   const ids = members.map(m => m.id).join(',');
+  const varying = NTS.bookVarying(members);
   return `<div class="book" data-ids="${ids}">
     <div class="book-head"><span class="title">BOOK OF ${members.length}</span>
-      <span class="pre">${esc(NTS.preambleLine(f, { noNumber: true }))}</span><span class="spacer" style="flex:1"></span>
+      <span class="pre">${esc(NTS.bookCommon(members))}</span><span class="spacer" style="flex:1"></span>
       <button class="btn sm" data-bookact="copy">Copy as book</button>
       <button class="btn sm" data-bookact="select">Select</button>
       <button class="btn sm primary" data-bookact="${route === 'deliver' ? 'deliver' : 'relay'}">${route === 'deliver' ? 'Deliver all…' : 'Relay book…'}</button></div>
     <div class="book-text">${esc(f.text)}${f.sig ? ' — ' + esc(f.sig.replace(/\n/g, ' ')) : ''}</div>
-    ${members.map(rowHtml).join('')}
+    ${members.map(m => rowHtml(m, NTS.bookNrLine(m, varying))).join('')}
   </div>`;
 }
 
