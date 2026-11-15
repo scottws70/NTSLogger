@@ -628,7 +628,9 @@ function renderNets() {
     ul.innerHTML = `<li class="muted">No nets set up yet. <a href="#" data-goto="settings" data-anchor="nets-anchor">Add the nets you check into</a>.</li>`;
     return;
   }
-  const occ = netOccurrences(7).slice(0, 7);
+  const occ = netOccurrences(7).slice(0, 40);
+  const keepScroll = ul.scrollTop;
+  requestAnimationFrame(() => { ul.scrollTop = keepScroll; });
   if (!occ.length) { ul.innerHTML = '<li class="muted">No nets scheduled in the next week.</li>'; return; }
   const now = Date.now();
   const today = new Date(); today.setHours(0, 0, 0, 0);

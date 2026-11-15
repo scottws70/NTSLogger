@@ -140,13 +140,29 @@ main { padding: 16px; max-width: 1280px; margin: 0 auto; }
 .tile.hot .num { color: var(--prio); }
 .tile.accent .num { color: var(--accent); }
 
-.net-list { list-style: none; margin: 0; padding: 0; }
-.net-list li { display: flex; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border); align-items: baseline; }
+/* Compact top row: both panels share the height of three net lines */
+.grid-dash > .panel { padding: 10px 14px; }
+.grid-dash .panel-head { margin-bottom: 4px; }
+.grid-dash .today-date { font-size: 19px; }
+.grid-dash .clock-row { margin-top: 4px; }
+
+.net-list {
+  list-style: none; margin: 0; padding: 0 4px 0 0;
+  --net-row: 50px;
+  max-height: calc(var(--net-row) * 3);
+  overflow-y: auto; overscroll-behavior: contain;
+}
+.net-list li {
+  display: flex; gap: 12px; height: var(--net-row); padding: 6px 0;
+  border-top: 1px solid var(--border); align-items: baseline;
+}
 .net-list li:first-child { border-top: 0; }
+.net-list li.muted { height: auto; }
 .net-when { width: 128px; flex: none; font-family: var(--mono); font-size: 13px; }
 .net-when .day { display: block; font-family: system-ui, sans-serif; font-size: 12px; color: var(--muted); }
-.net-name { font-weight: 600; }
-.net-meta { font-size: 12px; color: var(--muted); }
+.net-list li > div:nth-child(2) { min-width: 0; flex: 1; }
+.net-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.net-meta { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .net-badge { margin-left: auto; white-space: nowrap; font-size: 12px; }
 
 /* ---------- badges ---------- */
