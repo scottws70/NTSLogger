@@ -144,6 +144,18 @@
 
   // ---------- address ----------
 
+  /**
+   * Radiograms spell out e-mail addresses the way hams send them: "JSMITH ATSIGN GMAIL DOT COM"
+   * (or "AT SIGN"). Find such an address so it can be filed as the e-mail — it is kept exactly
+   * as written, not converted to "@" form. DOT only counts as part of the address when it's
+   * joined to the ATSIGN run, so a street like "DOT RD" is left alone.
+   */
+  const SPOKEN_EMAIL_RE = /(?:[A-Z0-9._%+\-]+\s+DOT\s+)*[A-Z0-9._%+\-]+\s*\bAT\s?SIGN\b\s*[A-Z0-9\-]+(?:(?:\s*\.\s*|\s+DOT\s+)[A-Z0-9\-]+)*/i;
+  function findSpokenEmail(s) {
+    const m = SPOKEN_EMAIL_RE.exec(String(s || ''));
+    return m ? { email: squash(m[0]).toUpperCase(), rest: squash(s.slice(0, m.index) + ' ' + s.slice(m.index + m[0].length)) } : null;
+  }
+
   function emptyAddress() {
     return { name: '', street: '', city: '', state: '', zip: '', phone: '', email: '' };
   }
@@ -178,8 +190,10 @@
 
   function parseAddressOneLine(line, a, warnings) {
     let s = line;
+    const sp = findSpokenEmail(s);
     const em = /\S+@\S+/.exec(s);
-    if (em) { a.email = em[0].toLowerCase(); s = squash(s.replace(em[0], ' ')); }
+    if (sp) { a.email = sp.email; s = sp.rest; }
+    else if (em) { a.email = em[0].toLowerCase(); s = squash(s.replace(em[0], ' ')); }
     const ph = extractPhone(s);
     if (ph) { a.phone = ph.phone; s = ph.rest; }
     const toks = s.split(' ').filter(Boolean);
@@ -224,6 +238,12 @@
 
     const rest = [];
     for (let l of lines) {
+      const sp = findSpokenEmail(l);
+      if (sp) {
+        a.email = sp.email;
+        l = sp.rest.replace(/^E-?MAIL\b[:\s]*/, '');
+        if (!l) continue;
+      }
       if (/@/.test(l) || /^E-?MAIL\b/.test(l)) { a.email = l.replace(/^E-?MAIL\b[:\s]*/, '').replace(/\s+/g, '').toLowerCase(); continue; }
       const ph = extractPhone(l);
       if (ph && (ph.rest === '' || !/^\d/.test(l) || /^(TEL|PHONE|PH|CELL)/.test(l))) {
@@ -600,7 +620,7 @@
 
   const API = {
     parseTraffic, computeCheck, normCheck, formatRadiogram, formatBook, bookKey, preambleLine,
-    bookVarying, bookCommon, bookNrLine,
+    bookVarying, bookCommon, bookNrLine, findSpokenEmail,
     addressLines, textLines, textWords, parseAddress, PREC_RANK, MONTHS, STATES, precLabel
   };
   root.NTS = API;
