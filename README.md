@@ -22,12 +22,21 @@ Everything is stored on your own computer. No internet connection is needed.
   - Inside each group, messages are sorted by precedence (Emergency, Priority, Welfare, Routine), then ZIP code.
   - Messages in the same group with the same **check**, **place of origin**, **text**, and **signature** are shown together as a **BOOK OF n**. Their precedence, HX, station of origin, time, and date may differ. Whatever is the same for all of them goes in the book's header, and whatever differs goes on each message's own NR line.
 
-Each row shows the precedence, number, addressee, destination, phone, where it came from, and how long it has been waiting. Click a row to see the whole radiogram.
+Each row shows the precedence, number, addressee, destination, phone, where it came from, and how long it has been waiting. Click a row to see the whole radiogram. Clicking a message that's inside a book shows only that message's own part, its NR line and address, since the text is on the book; **Whole message** shows the full radiogram.
 
 **Relaying or delivering:**
 - Click **Relay** or **Deliver** on a row, or
 - Tick several rows (or click **Select** on a book) and use **Relay selected…** / **Deliver selected…**, or
 - Click **Relay book…** on a book to log all of its messages at once.
+
+**On the air — one-click relays.** The **On the air** bar above the list is for when you're passing traffic on a net and don't want to keep the other station waiting:
+
+- **Net** fills itself in with whichever of My Nets is on now. Type over it for a net that isn't in your list.
+- Enter the station taking traffic in **Sending to**. The bar lights up and every Relay button changes to **Relay → W8ABC** (and **Relay book → W8ABC**, **Relay 3 → W8ABC**). One click logs the relay to that station, on that net, at the current UTC time.
+- The confirmation at the bottom has an **Undo** button for about ten seconds. After that, open the message from the Log and use **Return to waiting**.
+- When another station takes traffic, type the new callsign. **Clear** turns one-click relaying off.
+
+With **Sending to** empty, Relay opens the usual window. It comes filled in with the net that's on now and the last station you relayed to in the past three hours, so **Enter** is usually all it needs.
 
 A relay records the station you passed it to, the net, and the UTC date and time. A delivery records who it was delivered to, how (phone, email, in person, mail, …), and the UTC time. **Undeliverable…** records the reason and the station you sent a service message to.
 
@@ -49,7 +58,7 @@ CANTON OH 44702
 AR
 ```
 
-Here the two messages came from different stations on different dates, so the station and date are on each NR line. When everything in the preamble matches, the NR line is just the number.
+Here the two messages came from different stations on different dates, so the station and date are on each NR line. When everything in the preamble matches, the NR line is just the number. An **op note** that is the same on every message of the book is given once, right after the signature; op notes that differ stay with their own messages.
 
 ## Enter Traffic
 

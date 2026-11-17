@@ -602,25 +602,42 @@
     return ['NR ' + m.nr].concat(varying.map(k => varValue(m, k))).filter(Boolean).join(' ');
   }
 
+  /** The op note every message of a book carries, or '' when they differ or there is none. */
+  function bookCommonNote(msgs) {
+    const n = squash(msgs[0] && msgs[0].opNote);
+    return n && msgs.every(m => squash(m.opNote) === n) ? n : '';
+  }
+
+  /**
+   * One message's own part of a book: its NR line, its address, and its op note
+   * unless the whole book shares that note (then it goes once, after the signature).
+   */
+  function bookPartLines(m, msgs, varying, commonNote) {
+    if (!varying) varying = bookVarying(msgs);
+    if (commonNote === undefined) commonNote = bookCommonNote(msgs);
+    const out = [bookNrLine(m, varying)];
+    addressLines(m.to).forEach(l => out.push(l));
+    if (m.opNote && !commonNote) out.push('OP NOTE ' + m.opNote);
+    return out;
+  }
+  function formatBookPart(m, msgs) { return bookPartLines(m, msgs).join('\n'); }
+
   function formatBook(msgs) {
     const f = msgs[0];
-    const varying = bookVarying(msgs);
+    const varying = bookVarying(msgs), note = bookCommonNote(msgs);
     const out = ['BOOK OF ' + msgs.length + ' ' + bookCommon(msgs), 'BT'];
     textLines(f.text).forEach(l => out.push(l));
     out.push('BT');
     String(f.sig || '').split('\n').forEach(l => l && out.push(l));
-    msgs.forEach(m => {
-      out.push(bookNrLine(m, varying));
-      addressLines(m.to).forEach(l => out.push(l));
-      if (m.opNote) out.push('OP NOTE ' + m.opNote);
-    });
+    if (note) out.push('OP NOTE ' + note);
+    msgs.forEach(m => bookPartLines(m, msgs, varying, note).forEach(l => out.push(l)));
     out.push('AR');
     return out.join('\n');
   }
 
   const API = {
     parseTraffic, computeCheck, normCheck, formatRadiogram, formatBook, bookKey, preambleLine,
-    bookVarying, bookCommon, bookNrLine, findSpokenEmail,
+    bookVarying, bookCommon, bookNrLine, bookCommonNote, formatBookPart, findSpokenEmail,
     addressLines, textLines, textWords, parseAddress, PREC_RANK, MONTHS, STATES, precLabel
   };
   root.NTS = API;

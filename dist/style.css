@@ -309,6 +309,20 @@ pre.radiogram {
   opacity: 0; transition: opacity .2s; pointer-events: none;
 }
 #toast.show { opacity: .95; }
+#toast.show.action { pointer-events: auto; }
+#toast button { margin-left: 12px; border: 1px solid currentColor; background: transparent; color: inherit; border-radius: 6px; padding: 1px 10px; font: inherit; cursor: pointer; }
+
+/* ---------- on-the-air bar ---------- */
+.air-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; color: var(--muted);
+}
+.air-bar.armed { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }
+.air-bar .air-title { font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
+.air-bar label { display: flex; align-items: center; gap: 6px; }
+.air-bar input { width: 130px; }
+.air-bar #air-to { width: 110px; font-family: var(--mono); }
+.air-bar .air-hint { flex: 1; min-width: 180px; }
 
 /* ---------- reports ---------- */
 .report-big { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }

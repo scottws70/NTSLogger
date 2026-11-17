@@ -46,6 +46,13 @@
           <button class="btn sm primary" id="wait-deliver" disabled>Deliver selected…</button>
           <button class="btn sm" id="wait-service" disabled>Undeliverable…</button>
         </div>
+        <div class="air-bar" id="air-bar">
+          <span class="air-title">On the air</span>
+          <label>Net <input id="air-net" list="dl-nets" autocomplete="off" placeholder="None on now"></label>
+          <label>Sending to <input id="air-to" class="up" list="dl-stations" autocomplete="off" placeholder="Callsign" maxlength="12"></label>
+          <button class="btn sm" id="air-clear" title="Clear the station and go back to the net that's on now">Clear</button>
+          <span class="air-hint" id="air-hint"></span>
+        </div>
         <div id="wait-list"></div>
       </div>
     </section>

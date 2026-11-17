@@ -72,12 +72,20 @@ function localTime(d, secs) {
 }
 function msgNrNum(m) { const n = parseInt(m.nr, 10); return isNaN(n) ? 1e9 : n; }
 
-function toast(msg) {
+/** undo: optional function; when given, the toast stays longer and carries an Undo button. */
+function toast(msg, undo) {
   const t = $('#toast');
   t.textContent = msg;
+  t.classList.toggle('action', !!undo);
+  if (undo) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = 'Undo';
+    b.addEventListener('click', () => { t.classList.remove('show', 'action'); undo(); });
+    t.appendChild(b);
+  }
   t.classList.add('show');
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => t.classList.remove('show'), 2600);
+  toast._t = setTimeout(() => t.classList.remove('show', 'action'), undo ? 10000 : 2600);
 }
 
 async function copyText(text) {
@@ -475,24 +483,40 @@ function historyHtml(m) {
   return `<ul class="history">${items.join('')}</ul>`;
 }
 
-function openView(id) {
+/**
+ * bookIds: when the message was opened from inside a book on the waiting list, the ids of
+ * that book. The view then shows only the message's own part of the book (NR line and
+ * address); the shared text is on the book itself. "Whole message" shows the full radiogram.
+ */
+function openView(id, bookIds) {
   const m = getMsg(id);
   if (!m) return;
   const waiting = m.status === 'waiting';
+  const book = (bookIds || []).map(getMsg).filter(Boolean);
+  const inBook = book.length > 1 && book.includes(m);
+  let shown = inBook ? NTS.formatBookPart(m, book) : NTS.formatRadiogram(m);
+  let whole = !inBook;
   const el = openModal({
-    title: `NR ${esc(m.nr)} <span class="prec prec-${m.prec}">${esc(precShort(m.prec))}</span> ${statusBadge(m)}`,
+    title: `NR ${esc(m.nr)} <span class="prec prec-${m.prec}">${esc(precShort(m.prec))}</span> ${statusBadge(m)}${inBook ? ` <span class="badge acc">In book of ${book.length}</span>` : ''}`,
     body: `${m.checkMismatch ? `<p style="margin:0 0 8px"><span class="badge warn">Check ${esc(m.check)} — counted ${esc(m.checkCalc || NTS.computeCheck(m.text))}</span></p>` : ''}
-      <pre class="radiogram">${esc(NTS.formatRadiogram(m))}</pre>
+      <pre class="radiogram">${esc(shown)}</pre>
       <h3 style="margin:14px 0 4px">History</h3>${historyHtml(m)}`,
     foot: `<div class="left"><button class="btn danger" data-a="delete">Delete</button>${!waiting ? '<button class="btn" data-a="unclose">Return to waiting</button>' : ''}</div>
-      <button class="btn" data-a="copy">Copy</button><button class="btn" data-a="edit">Edit</button>
+      ${inBook ? '<button class="btn" data-a="whole">Whole message</button>' : ''}<button class="btn" data-a="copy">Copy</button><button class="btn" data-a="edit">Edit</button>
       ${waiting ? '<button class="btn" data-a="service">Undeliverable…</button><button class="btn primary" data-a="relay">Relay…</button><button class="btn primary" data-a="deliver">Deliver…</button>' : ''}`
   });
   el.addEventListener('click', async e => {
     const b = e.target.closest('[data-a]');
     if (!b) return;
     const a = b.dataset.a;
-    if (a === 'copy') return copyText(NTS.formatRadiogram(m));
+    if (a === 'whole') {
+      whole = !whole;
+      shown = whole ? NTS.formatRadiogram(m) : NTS.formatBookPart(m, book);
+      $('pre.radiogram', el).textContent = shown;
+      b.textContent = whole ? 'Book part only' : 'Whole message';
+      return;
+    }
+    if (a === 'copy') return copyText(shown);
     if (a === 'edit') { closeModal(el); return openEdit(id); }
     if (a === 'relay' || a === 'deliver' || a === 'service') { closeModal(el); return openDisposition(a, [id]); }
     if (a === 'unclose') {
@@ -540,8 +564,8 @@ function openDisposition(kind, ids) {
   let fields = '';
   if (kind === 'relay') {
     fields = `<div class="form-grid">
-      <label class="f c4">Relayed to (callsign)<input class="up" data-f="to" list="dl-stations"></label>
-      <label class="f c4">Net<input data-f="net" list="dl-nets"></label>
+      <label class="f c4">Relayed to (callsign)<input class="up" data-f="to" list="dl-stations" value="${esc(air.to || lastRelayTo())}"></label>
+      <label class="f c4">Net<input data-f="net" list="dl-nets" value="${esc(airNet())}"></label>
       <div class="c4"><label class="f">UTC date / time</label>${utcField('when')}</div>
       <label class="f c12">Note<input data-f="note"></label></div>`;
   } else if (kind === 'deliver') {
@@ -554,7 +578,7 @@ function openDisposition(kind, ids) {
     fields = `<div class="form-grid">
       <label class="f c4">Reason<select data-f="reason">${SERVICE_REASONS.map(x => `<option>${x}</option>`).join('')}</select></label>
       <label class="f c4">Service message sent to<input class="up" data-f="to" list="dl-stations" placeholder="Originating station"></label>
-      <label class="f c4">Net<input data-f="net" list="dl-nets"></label>
+      <label class="f c4">Net<input data-f="net" list="dl-nets" value="${esc(airNet())}"></label>
       <div class="c6"><label class="f">UTC date / time</label>${utcField('when')}</div>
       <label class="f c12">Note<input data-f="note"></label></div>`;
   }
@@ -564,6 +588,17 @@ function openDisposition(kind, ids) {
   });
   if (kind === 'deliver' && n === 1 && msgs[0].to.phone) $('[data-f=method]', el).value = 'Phone';
   else if (kind === 'deliver' && n === 1 && msgs[0].to.email) $('[data-f=method]', el).value = 'Email';
+  // A filled-in callsign is selected, so typing replaces it and Enter accepts it.
+  if (kind === 'relay') setTimeout(() => { const t = $('[data-f=to]', el); if (t && t.value) t.select(); }, 40);
+  // Enter logs it. Acting on key-up lets a pick from the callsign or net list land first, and
+  // the key-down check ignores the Enter that opened this window.
+  let enterDown = false;
+  el.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input, select')) enterDown = true; });
+  el.addEventListener('keyup', e => {
+    if (e.key !== 'Enter') return;
+    const armed = enterDown; enterDown = false;
+    if (armed && e.target.matches('input, select')) $('[data-ok]', el).click();
+  });
   $('[data-ok]', el).addEventListener('click', () => {
     const g = k => { const x = $(`[data-f="${k}"]`, el); return x ? squash(x.value) : ''; };
     const utc = readUtc($('[data-utc=when]', el));
@@ -571,15 +606,99 @@ function openDisposition(kind, ids) {
     if (!utc) errs.push('Enter a valid UTC date and time (HHMM)');
     if (kind === 'relay' && !g('to')) errs.push('Enter the station you relayed to');
     if (errs.length) { $('.form-errors', el).innerHTML = `<ul class="warnlist">${errs.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`; return; }
+    if (kind === 'relay') { closeModal(el); return logRelayed(msgs, g('to'), g('net'), utc, g('note')); }
     msgs.forEach(m => {
-      if (kind === 'relay') { m.status = 'relayed'; m.disp = { to: g('to').toUpperCase(), net: g('net'), utc, note: g('note') }; }
-      else if (kind === 'deliver') { m.status = 'delivered'; m.disp = { to: g('to') || m.to.name, method: g('method'), utc, note: g('note') }; }
+      if (kind === 'deliver') { m.status = 'delivered'; m.disp = { to: g('to') || m.to.name, method: g('method'), utc, note: g('note') }; }
       else { m.status = 'serviced'; m.disp = { reason: g('reason'), to: g('to').toUpperCase(), net: g('net'), utc, note: g('note') }; }
       sel.delete(m.id);
     });
     save(); closeModal(el); renderAll();
-    toast((n === 1 ? 'NR ' + msgs[0].nr : n + ' messages') + (kind === 'relay' ? ' logged as relayed' : kind === 'deliver' ? ' logged as delivered' : ' logged as undeliverable'));
+    toast((n === 1 ? 'NR ' + msgs[0].nr : n + ' messages') + (kind === 'deliver' ? ' logged as delivered' : ' logged as undeliverable'));
   });
+}
+
+// =====================================================================
+// On the air: one-click relays
+// =====================================================================
+// net: null follows whichever of My Nets is on now; a typed value overrides it.
+// to: the station taking traffic. While it is set, Relay buttons log with one click.
+const air = { net: null, to: '' };
+
+function netOnNow() {
+  const now = Date.now();
+  const o = netOccurrences(0).find(x => x.start <= now);
+  return o ? (o.net.name || '') : '';
+}
+function airNet() { return air.net !== null ? air.net : netOnNow(); }
+
+/** The station of the most recent relay, if it was within the last 3 hours (the same sitting). */
+function lastRelayTo() {
+  const since = Date.now() - 3 * 3600000;
+  let best = null;
+  S.messages.forEach(m => {
+    if (m.status !== 'relayed' || !m.disp || !m.disp.to) return;
+    const t = Date.parse(m.disp.utc);
+    if (t >= since && t <= Date.now() + 60000 && (!best || t > best.t)) best = { t, to: m.disp.to };
+  });
+  return best ? best.to : '';
+}
+
+function logRelayed(msgs, to, net, utc, note) {
+  msgs = msgs.filter(m => m && m.status === 'waiting');
+  if (!msgs.length) return;
+  to = squash(to).toUpperCase();
+  const mine = new Map();
+  msgs.forEach(m => {
+    m.status = 'relayed';
+    m.disp = { to, net: squash(net), utc, note: note || '' };
+    mine.set(m, m.disp);
+    sel.delete(m.id);
+  });
+  save(); renderAll();
+  const what = msgs.length === 1 ? 'NR ' + msgs[0].nr : msgs.length + ' messages';
+  toast(`${what} relayed to ${to}${net ? ' on ' + squash(net) : ''}`, () => {
+    // only what this relay logged, and only if nothing has changed it since
+    mine.forEach((d, m) => { if (m.status === 'relayed' && m.disp === d) { m.status = 'waiting'; m.disp = null; } });
+    save(); renderAll(); toast(what + ' returned to waiting');
+  });
+}
+
+/** Relay button pressed: one click when a station is set in the On the air bar, otherwise ask. */
+function quickRelay(ids) {
+  if (!air.to) return openDisposition('relay', ids);
+  logRelayed(ids.map(getMsg), air.to, airNet(), new Date().toISOString(), '');
+}
+
+function renderAirBar() {
+  const bar = $('#air-bar');
+  if (!bar) return;
+  const netEl = $('#air-net'), toEl = $('#air-to');
+  if (document.activeElement !== netEl) netEl.value = airNet();
+  if (document.activeElement !== toEl) toEl.value = air.to;
+  bar.classList.toggle('armed', !!air.to);
+  const net = airNet();
+  $('#air-hint').textContent = air.to
+    ? `One click on Relay logs it to ${air.to}${net ? ' on ' + net : ''} at the current UTC time.`
+    : 'Enter the station taking traffic and each Relay button logs with one click.';
+  $('#air-clear').disabled = !air.to && air.net === null;
+}
+
+function bindAirBar() {
+  const netEl = $('#air-net'), toEl = $('#air-to');
+  netEl.addEventListener('change', () => { const v = squash(netEl.value); air.net = v ? v : null; renderWaiting(); });
+  const setTo = () => {
+    const v = squash(toEl.value).toUpperCase();
+    if (v && !/^(?=.*\d)[A-Z0-9/]{3,}$/.test(v)) {
+      air.to = ''; renderWaiting();
+      $('#air-hint').textContent = `"${v}" doesn't look like a callsign.`;
+      return;
+    }
+    air.to = v; renderWaiting();
+  };
+  toEl.addEventListener('change', setTo);
+  toEl.addEventListener('keydown', e => { if (e.key === 'Enter') toEl.blur(); });
+  netEl.addEventListener('keydown', e => { if (e.key === 'Enter') netEl.blur(); });
+  $('#air-clear').addEventListener('click', () => { air.to = ''; air.net = null; renderWaiting(); });
 }
 
 // =====================================================================
@@ -701,7 +820,7 @@ function rowHtml(m, nrLine) {
       <div class="where">${nrLine ? '<span class="mono">' + esc(nrLine) + '</span> · ' : ''}${esc(destText(m) || 'no city / state')} · ${nrLine ? '' : esc(m.station) + ' ' + esc(m.place) + ' · '}${esc(sourceText(m))}</div>
     </div>
     <div class="acts"><span class="badge ${over ? 'bad' : ''}" title="Time waiting">${ageText(h)}</span>
-      <button class="btn sm" data-act="relay">Relay</button><button class="btn sm" data-act="deliver">Deliver</button></div>
+      <button class="btn sm${air.to ? ' primary' : ''}" data-act="relay"${air.to ? ` title="Log as relayed to ${esc(air.to)} now"` : ''}>${air.to ? 'Relay → ' + esc(air.to) : 'Relay'}</button><button class="btn sm" data-act="deliver">Deliver</button></div>
   </div>`;
 }
 
@@ -723,7 +842,7 @@ function renderWaiting() {
 }
 
 function bookHtml(members, route) {
-  const f = members[0];
+  const f = members[0], note = NTS.bookCommonNote(members);
   const ids = members.map(m => m.id).join(',');
   const varying = NTS.bookVarying(members);
   return `<div class="book" data-ids="${ids}">
@@ -731,8 +850,8 @@ function bookHtml(members, route) {
       <span class="pre">${esc(NTS.bookCommon(members))}</span><span class="spacer" style="flex:1"></span>
       <button class="btn sm" data-bookact="copy">Copy as book</button>
       <button class="btn sm" data-bookact="select">Select</button>
-      <button class="btn sm primary" data-bookact="${route === 'deliver' ? 'deliver' : 'relay'}">${route === 'deliver' ? 'Deliver all…' : 'Relay book…'}</button></div>
-    <div class="book-text">${esc(f.text)}${f.sig ? ' — ' + esc(f.sig.replace(/\n/g, ' ')) : ''}</div>
+      <button class="btn sm primary" data-bookact="${route === 'deliver' ? 'deliver' : 'relay'}">${route === 'deliver' ? 'Deliver all…' : air.to ? 'Relay book → ' + esc(air.to) : 'Relay book…'}</button></div>
+    <div class="book-text">${esc(f.text)}${f.sig ? ' — ' + esc(f.sig.replace(/\n/g, ' ')) : ''}${note ? ' · OP NOTE ' + esc(note) : ''}</div>
     ${members.map(m => rowHtml(m, NTS.bookNrLine(m, varying))).join('')}
   </div>`;
 }
@@ -740,7 +859,8 @@ function bookHtml(members, route) {
 function updateSelButtons() {
   const n = sel.size;
   ['#wait-relay', '#wait-deliver', '#wait-service'].forEach(s => { $(s).disabled = !n; });
-  $('#wait-relay').textContent = n ? `Relay ${n}…` : 'Relay selected…';
+  $('#wait-relay').textContent = n ? (air.to ? `Relay ${n} → ${air.to}` : `Relay ${n}…`) : 'Relay selected…';
+  renderAirBar();
   $('#wait-deliver').textContent = n ? `Deliver ${n}…` : 'Deliver selected…';
 }
 
@@ -1217,15 +1337,16 @@ function init() {
       const a = bookBtn.dataset.bookact;
       if (a === 'copy') return copyText(NTS.formatBook(ids.map(getMsg)));
       if (a === 'select') { const all = ids.every(id => sel.has(id)); ids.forEach(id => all ? sel.delete(id) : sel.add(id)); return renderWaiting(); }
-      return openDisposition(a, ids);
+      return a === 'relay' ? quickRelay(ids) : openDisposition(a, ids);
     }
     const row = e.target.closest('.msg-row');
     if (!row) return;
     const id = row.dataset.id;
     if (e.target.classList.contains('sel')) { e.target.checked ? sel.add(id) : sel.delete(id); updateSelButtons(); return; }
     const act = e.target.closest('[data-act]');
-    if (act) return openDisposition(act.dataset.act, [id]);
-    openView(id);
+    if (act) return act.dataset.act === 'relay' ? quickRelay([id]) : openDisposition(act.dataset.act, [id]);
+    const inBook = row.closest('.book');
+    openView(id, inBook ? inBook.dataset.ids.split(',') : null);
   });
   $('#wait-search').addEventListener('input', renderWaiting);
   $('#wait-selall').addEventListener('click', () => {
@@ -1234,7 +1355,8 @@ function init() {
     rows.forEach(id => all ? sel.delete(id) : sel.add(id));
     renderWaiting();
   });
-  $('#wait-relay').addEventListener('click', () => openDisposition('relay', Array.from(sel)));
+  $('#wait-relay').addEventListener('click', () => quickRelay(Array.from(sel)));
+  bindAirBar();
   $('#wait-deliver').addEventListener('click', () => openDisposition('deliver', Array.from(sel)));
   $('#wait-service').addEventListener('click', () => openDisposition('service', Array.from(sel)));
 
@@ -1291,7 +1413,7 @@ function init() {
 
   renderAll();
   setInterval(renderClock, 1000);
-  setInterval(() => { renderNets(); renderTiles(); }, 60000);
+  setInterval(() => { renderNets(); renderTiles(); renderAirBar(); }, 60000);
 
   if (!S.settings.call) {
     toast('Welcome! Start in Settings with your callsign and nets.');
