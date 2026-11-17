@@ -35,11 +35,88 @@ function loadStore() {
   return normalizeStore(null);
 }
 
-let S = loadStore();
+// The installed app keeps the traffic in files in its own data folder (see
+// src-tauri/src/store.rs). Opened in a plain web browser, it stays in the browser's storage.
+const FILE_STORE = !!(window.__TAURI__ && window.__TAURI__.core);
+const invoke = (cmd, args) => window.__TAURI__.core.invoke(cmd, args);
+// Nothing is saved until the file has been read, so a start that went wrong can never
+// write an empty log over a good one.
+let STORE_READY = !FILE_STORE;
+let bootNotice = null;   // {title, html} shown once the page is up
+
+let S = FILE_STORE ? normalizeStore(null) : loadStore();
+
+function localDateStr(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 
 function save() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); }
-  catch (e) { toast('Could not save: ' + e.message); }
+  if (FILE_STORE) { if (STORE_READY) fileSave(); return; }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); showSaveFailed(''); }
+  catch (e) { showSaveFailed('Your changes are not being saved: ' + e.message); }
+}
+
+// One save at a time; changes made while one is being written go out in the next.
+let saving = false, saveAgain = false;
+async function fileSave() {
+  if (saving) { saveAgain = true; return; }
+  saving = true;
+  try {
+    do {
+      saveAgain = false;
+      await invoke('store_save', { store: JSON.stringify(S), today: localDateStr(new Date()) });
+    } while (saveAgain);
+    showSaveFailed('');
+  } catch (e) {
+    showSaveFailed('Your changes are not being saved: ' + e);
+  } finally { saving = false; }
+}
+
+/** A red bar across the top while saving isn't working; '' takes it away. */
+function showSaveFailed(text) {
+  const bar = document.getElementById('save-fail');
+  if (!bar) return;
+  bar.querySelector('span').textContent = text || '';
+  bar.querySelector('button').classList.toggle('hidden', !STORE_READY);
+  bar.classList.toggle('hidden', !text);
+}
+
+/** Reads the traffic file at startup; on the first run with file storage, moves the web view's copy into it. */
+async function bootStore() {
+  if (!FILE_STORE) return;
+  const fmtDay = name => new Date(name + 'T12:00:00').toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+  let r;
+  try { r = await invoke('store_load'); }
+  catch (e) {
+    bootNotice = { title: "Couldn't read your traffic", html: `<p>${esc(String(e))}</p><p>Nothing is shown and nothing will be saved, so the file is left exactly as it is. Close the app and start it again.</p>` };
+    return;
+  }
+  if (r.store) { S = normalizeStore(JSON.parse(r.store)); STORE_READY = true; return; }
+  if (r.damaged) {
+    const d = r.damaged;
+    const kept = `The unreadable file was kept as <b>${esc(d.keptAs)}</b> in the data folder.`;
+    if (d.newestSnapshot) {
+      try {
+        S = normalizeStore(JSON.parse(await invoke('store_snapshot_read', { name: d.newestSnapshot })));
+        STORE_READY = true; save();
+        bootNotice = { title: 'Traffic restored from a snapshot', html: `<p>Your traffic file couldn't be read, so the app restored its automatic snapshot from before the changes of <b>${esc(fmtDay(d.newestSnapshot))}</b>. Anything entered after that is missing.</p><p>${kept} Other snapshots are under Settings → Backup &amp; Restore.</p>` };
+        return;
+      } catch (e) { console.error(e); }
+    }
+    STORE_READY = true;
+    bootNotice = { title: "Your traffic file couldn't be read", html: `<p>There was no automatic snapshot to fall back on, so the app has started empty. If you have a backup, restore it under Settings → Backup &amp; Restore.</p><p>${kept}</p>` };
+    return;
+  }
+  // First run with file storage: bring over what the web view holds. Its copy is left where it is.
+  let raw = null, old = null;
+  try { raw = localStorage.getItem(STORE_KEY); if (raw) old = normalizeStore(JSON.parse(raw)); } catch (e) { console.error(e); }
+  if (old) {
+    S = old;
+    try { await invoke('store_migrate', { store: JSON.stringify(old), original: raw, today: localDateStr(new Date()) }); }
+    catch (e) {
+      bootNotice = { title: "Couldn't move your traffic", html: `<p>This version keeps your traffic in a file in the app's data folder, but moving it there failed:</p><p>${esc(String(e))}</p><p>Your traffic is shown, but <b>changes will not be saved</b>. Use Settings → Save backup… now, then close the app and start it again.</p>` };
+      return;
+    }
+  }
+  STORE_READY = true;
 }
 
 // =====================================================================
@@ -1275,8 +1352,165 @@ async function restoreBackup(file) {
     if (!data || !Array.isArray(data.messages) || !data.settings) throw new Error('Not an NTS Traffic Logger backup');
     const ok = await askConfirm('Restore backup', `Replace everything currently stored (${S.messages.length} messages) with this backup (${data.messages.length} messages)?`, 'Replace', true);
     if (!ok) return;
+    await keepBeforeRestore();
     S = normalizeStore(data); save(); applyTheme(); fillSettings(); renderAll(); toast('Backup restored');
-  } catch (e) { toast('Could not restore: ' + e.message); }
+  } catch (e) { toast('Could not restore: ' + ((e && e.message) || e)); }
+}
+
+// ---------- automatic snapshots (the installed app) ----------
+/** Keeps everything as it is now, so a restore can be undone. A failure here stops the restore. */
+async function keepBeforeRestore() {
+  if (FILE_STORE && STORE_READY) await invoke('store_keep_before_restore', { contents: JSON.stringify(S) });
+}
+
+async function renderSnapshots() {
+  const box = $('#snap-box');
+  if (!FILE_STORE || !box) return;
+  box.classList.remove('hidden');
+  invoke('store_folder').then(p => { $('#snap-path').textContent = p; }).catch(() => {});
+  let list = [];
+  try { list = await invoke('store_snapshots'); } catch (e) { console.error(e); }
+  const host = $('#snap-list');
+  if (!list.length) { host.innerHTML = '<div class="muted small">None yet. The first one is made the next day you change something.</div>'; return; }
+  host.innerHTML = list.map(s => {
+    const n = `${s.messages} message${s.messages === 1 ? '' : 's'}`;
+    const label = s.name === 'before-restore'
+      ? `<b>Before the last restore</b> <span class="muted">· ${esc(new Date(s.modified).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }))} · ${n}</span>`
+      : `<b>${esc(new Date(s.name + 'T12:00:00').toLocaleDateString([], { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }))}</b> <span class="muted">· before that day's changes · ${n}</span>`;
+    return `<div class="snap-row"><span>${label}</span><button class="btn sm" data-snap="${esc(s.name)}">Restore</button></div>`;
+  }).join('');
+}
+
+async function restoreSnapshot(name) {
+  try {
+    const data = JSON.parse(await invoke('store_snapshot_read', { name }));
+    const what = name === 'before-restore' ? 'what you had before the last restore' : 'the snapshot from before the changes of ' + new Date(name + 'T12:00:00').toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+    const ok = await askConfirm('Restore snapshot', `Replace everything currently stored (${S.messages.length} message${S.messages.length === 1 ? '' : 's'}) with ${esc(what)} (${data.messages.length} message${data.messages.length === 1 ? '' : 's'})? What you have now is kept as <b>Before the last restore</b>.`, 'Restore', true);
+    if (!ok) return;
+    await keepBeforeRestore();
+    S = normalizeStore(data); save(); applyTheme(); fillSettings(); renderAll(); renderSnapshots(); toast('Snapshot restored');
+  } catch (e) { toast('Could not restore: ' + ((e && e.message) || e)); }
+}
+
+// =====================================================================
+// Updates and version
+// =====================================================================
+// The updater plugin asks GitHub for a newer release, downloads it, checks its signature
+// and runs the right installer (.exe, .msi, .deb, .rpm or AppImage).
+const REPO = 'scottws70/NTSLogger';
+let pendingUpdate = null;   // {version, current, body, install()}
+
+/**
+ * The part of a release's notes that says what changed: everything above the guide to
+ * the installers, without the line about the app offering the update (it just did).
+ */
+function whatsNewHtml(body) {
+  const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>');
+  let html = '', inList = false;
+  for (const raw of String(body || '').replace(/\r/g, '').split('\n')) {
+    const t = raw.trim();
+    if (/^#{1,6}\s*(RPM|DEB|AppImage|Setup\.exe|APK)\b/i.test(t)) break;
+    if (/offers this update itself/i.test(t)) continue;
+    const li = /^[-*]\s+(.*)$/.exec(t);
+    if (li) { if (!inList) { html += '<ul>'; inList = true; } html += '<li>' + inline(li[1]) + '</li>'; continue; }
+    if (inList) { html += '</ul>'; inList = false; }
+    if (!t) continue;
+    const h = /^#{1,6}\s+(.*)$/.exec(t);
+    html += h ? '<h3>' + inline(h[1]) + '</h3>' : '<p>' + inline(t) + '</p>';
+  }
+  return html + (inList ? '</ul>' : '');
+}
+
+/** The notes as they are on GitHub right now (they can be corrected after a release), else as they were when it was published. */
+async function fetchReleaseNotes(version, fallback) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 6000);
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/tags/v${version}`, { signal: ctl.signal, cache: 'no-store', headers: { Accept: 'application/vnd.github+json' } });
+    if (r.ok) { const body = (await r.json()).body; if (body && body.trim()) return body; }
+  } catch (e) { /* offline or GitHub unreachable: use what came with the update */ }
+  finally { clearTimeout(timer); }
+  return fallback || '';
+}
+
+async function showWhatsNew() {
+  if (!pendingUpdate) return;
+  const u = pendingUpdate;
+  const el = openModal({ title: `What's new in version ${esc(u.version)}`, body: '<div class="whatsnew"><p class="muted">Loading…</p></div>', foot: '<button class="btn primary" data-close>Close</button>' });
+  const html = whatsNewHtml(await fetchReleaseNotes(u.version, u.body));
+  const host = $('.whatsnew', el);
+  if (host) host.innerHTML = html || '<p class="muted">No notes were written for this version.</p>';
+}
+
+function updateSay(text, bad) {
+  const el = $('#update-msg');
+  el.textContent = text || '';
+  el.classList.toggle('bad', !!bad);
+}
+function setUpdateBusy(busy) { $('#update-install').disabled = busy; $('#update-later').disabled = busy; }
+
+async function findUpdate() {
+  const up = await window.__TAURI__.updater.check();
+  if (!up) return null;
+  return {
+    version: up.version, current: up.currentVersion, body: up.body || '',
+    install: async () => {
+      let total = 0, got = 0;
+      updateSay('Downloading…');
+      await up.downloadAndInstall(ev => {
+        if (ev.event === 'Started') total = (ev.data && ev.data.contentLength) || 0;
+        else if (ev.event === 'Progress') {
+          got += (ev.data && ev.data.chunkLength) || 0;
+          if (total) updateSay('Downloading… ' + Math.min(100, Math.round(got * 100 / total)) + '%');
+        } else if (ev.event === 'Finished') updateSay('Installing…');
+      });
+      updateSay('Restarting…');
+      await window.__TAURI__.process.relaunch();
+    }
+  };
+}
+
+/** Looks for a newer version and shows the update bar if there is one. When asked by hand, also says when there isn't. */
+async function checkForUpdates(manual) {
+  const btn = $('#update-check');
+  const tell = text => {
+    if (!manual) return;
+    btn.textContent = text;
+    setTimeout(() => { btn.textContent = 'Check for Updates'; btn.disabled = false; }, 4000);
+  };
+  if (manual) { btn.disabled = true; btn.textContent = 'Checking…'; }
+  try {
+    const u = await findUpdate();
+    if (u) {
+      pendingUpdate = u;
+      $('#update-text').textContent = `Version ${u.version} is available` + (u.current ? ` (you have ${u.current}).` : '.');
+      updateSay(''); setUpdateBusy(false);
+      $('#update-bar').classList.remove('hidden');
+      if (manual) { btn.textContent = 'Check for Updates'; btn.disabled = false; }
+      return;
+    }
+    tell('Up to date ✓');
+  } catch (e) {
+    console.warn('Update check failed:', e);
+    tell("Couldn't reach GitHub");
+  }
+}
+
+function bindUpdates() {
+  const T = window.__TAURI__;
+  if (T && T.app) T.app.getVersion().then(v => { $('#app-version').textContent = v ? 'Version ' + v : ''; }).catch(() => {});
+  $('#update-install').addEventListener('click', async () => {
+    if (!pendingUpdate) return;
+    setUpdateBusy(true);
+    try { await pendingUpdate.install(); }
+    catch (e) { updateSay((e && e.message) || String(e), true); setUpdateBusy(false); }
+  });
+  $('#update-notes').addEventListener('click', showWhatsNew);
+  $('#update-later').addEventListener('click', () => $('#update-bar').classList.add('hidden'));
+  if (!(T && T.updater)) return;
+  $('#update-check').classList.remove('hidden');
+  $('#update-check').addEventListener('click', () => checkForUpdates(true));
+  setTimeout(() => checkForUpdates(false), 2000);
 }
 
 // =====================================================================
@@ -1310,7 +1544,7 @@ function showView(name, anchor) {
   $$('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.view === name));
   if (name === 'log') renderLog();
   if (name === 'reports') renderReports();
-  if (name === 'settings') fillSettings();
+  if (name === 'settings') { fillSettings(); renderSnapshots(); }
   if (name === 'dashboard') renderDashboard();
   if (anchor) { const a = document.getElementById(anchor); if (a) a.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
   else window.scrollTo(0, 0);
@@ -1410,14 +1644,25 @@ function init() {
   $('#bk-save').addEventListener('click', saveBackup);
   $('#bk-load').addEventListener('click', () => $('#bk-file').click());
   $('#bk-file').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) restoreBackup(f); });
+  $('#snap-list').addEventListener('click', e => { const b = e.target.closest('[data-snap]'); if (b) restoreSnapshot(b.dataset.snap); });
+  $('#snap-folder').addEventListener('click', () => invoke('store_open_folder').catch(e => toast('Could not open the folder: ' + e)));
+  $('#save-fail button').addEventListener('click', save);
+  bindUpdates();
 
   renderAll();
   setInterval(renderClock, 1000);
   setInterval(() => { renderNets(); renderTiles(); renderAirBar(); }, 60000);
 
-  if (!S.settings.call) {
+  if (bootNotice) {
+    openModal({ title: esc(bootNotice.title), body: bootNotice.html, foot: '<button class="btn primary" data-close>OK</button>' });
+    if (!STORE_READY) showSaveFailed('Your changes are not being saved.');
+  } else if (!S.settings.call) {
     toast('Welcome! Start in Settings with your callsign and nets.');
   }
 }
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', async () => {
+  try { await bootStore(); }
+  catch (e) { console.error(e); bootNotice = { title: "Couldn't read your traffic", html: `<p>${esc(String(e))}</p><p>Nothing will be saved. Close the app and start it again.</p>` }; }
+  init();
+});

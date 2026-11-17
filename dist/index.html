@@ -7,6 +7,16 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div id="save-fail" class="hidden" role="alert"><span></span><button class="btn sm">Try again</button></div>
+  <div id="update-bar" class="hidden" role="status">
+    <span class="update-text" id="update-text"></span>
+    <span class="btn-row">
+      <button class="btn primary" id="update-install">Install Update</button>
+      <button class="btn" id="update-notes">What's New</button>
+      <button class="btn" id="update-later">Later</button>
+    </span>
+    <span class="update-msg" id="update-msg"></span>
+  </div>
   <header class="top">
     <div class="brand">NTS Traffic Logger<span class="call" id="hdr-call"></span></div>
     <nav class="tabs" id="tabs">
@@ -145,7 +155,7 @@
     <!-- SETTINGS -->
     <section class="view" id="view-settings">
       <div class="panel">
-        <h2 style="margin-bottom:12px">My Station</h2>
+        <div class="panel-head" style="margin-bottom:12px"><h2>My Station</h2><span class="spacer"></span><span class="muted small mono" id="app-version"></span><button class="btn sm hidden" id="update-check">Check for Updates</button></div>
         <div class="form-grid">
           <label class="f c3">My callsign<input class="up" id="set-call"></label>
           <label class="f c3">Name<input id="set-name"></label>
@@ -184,6 +194,12 @@
           <button class="btn" id="bk-load">Restore from backup…</button>
           <input type="file" id="bk-file" accept=".json,application/json" class="hidden">
           <span class="muted small" id="bk-info"></span>
+        </div>
+        <div id="snap-box" class="hidden">
+          <h3>Automatic Snapshots</h3>
+          <p class="muted small" style="margin:2px 0 8px">The app keeps its own copy of your traffic from <b>before each day's changes</b>, for the last 7 days it changed. Restoring one can be undone: what you had is kept as <b>Before the last restore</b>. Snapshots are on this computer too, so keep saving backups.</p>
+          <div id="snap-list"></div>
+          <div class="btn-row" style="margin-top:10px"><button class="btn sm" id="snap-folder">Open Data Folder</button><span class="muted small mono" id="snap-path"></span></div>
         </div>
       </div>
     </section>

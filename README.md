@@ -2,7 +2,7 @@
 
 A desktop logbook for amateur radio NTS traffic handlers. Paste in a jumbled list of radiograms and it sorts them by where they're going, gathers matching messages into books, and keeps track of every message you **receive**, **originate**, **relay**, and **deliver** — who it came from, on what net, and when (UTC), and the same for where it went.
 
-Everything is stored on your own computer. No internet connection is needed.
+Everything is stored on your own computer. No internet connection is needed, except to check for a newer version of the app.
 
 ## Quick Start
 
@@ -116,3 +116,32 @@ Whether "today" and the report periods run on **local days or UTC days** is set 
 - **My Nets** — name, days of the week, start time (local or UTC), length, frequency/mode, notes. These fill the Dashboard and the Net choices when logging.
 - **Preferences** — theme, local or UTC days, overdue hours, 12/24-hour clock.
 - **Backup & Restore** — save everything to a `.json` file, or restore from one. Make a backup now and then, and before moving to a new computer.
+- **Automatic Snapshots** — see below.
+
+The app's **version** is shown at the top right of Settings, next to **Check for Updates**.
+
+## Updates
+
+The app looks for a newer version each time it starts. When there is one, a bar at the top says so:
+
+- **Install Update** downloads it, installs it, and restarts the app. The download is checked against the project's signing key first, so only genuine releases are accepted.
+- **What's New** shows what changed in that version, right in the app.
+- **Later** puts it off until the next start. **Check for Updates** in Settings looks again any time.
+
+Version 1.3.0 is the first that can update itself. From 1.2.0 or earlier, download and install 1.3.0 by hand once.
+
+## Where your traffic is kept
+
+The installed app keeps your traffic in a file in its own data folder, not in the web view's storage, so there is no size limit and it stays put when the app is updated or reinstalled. **Open Data Folder** (Settings → Backup & Restore) shows where it is; to move to a new computer, a backup file is still the simplest way.
+
+The first time version 1.3.0 or later starts, it moves your existing traffic into that file, checks that it arrived whole, and leaves the old copy where it was.
+
+Only one copy of the app runs at a time: starting it again brings the open window forward.
+
+### Automatic Snapshots
+
+The app keeps its own copy of your traffic from **before each day's changes**, for the last **7 days it changed**. They are listed under Settings → Backup & Restore, each with a **Restore** button.
+
+- A restore can be undone: what you had just before a restore (from a snapshot or a backup file) is kept as **Before the last restore**.
+- If the traffic file is ever damaged, the app restores the newest snapshot at startup, tells you so, and keeps the damaged file in the data folder.
+- Snapshots are on the same computer as your traffic, so keep saving backups too.
