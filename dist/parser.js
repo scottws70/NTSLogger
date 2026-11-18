@@ -145,15 +145,22 @@
   // ---------- address ----------
 
   /**
-   * Radiograms spell out e-mail addresses the way hams send them: "JSMITH ATSIGN GMAIL DOT COM"
-   * (or "AT SIGN"). Find such an address so it can be filed as the e-mail — it is kept exactly
-   * as written, not converted to "@" form. DOT only counts as part of the address when it's
-   * joined to the ATSIGN run, so a street like "DOT RD" is left alone.
+   * Radiograms spell out e-mail addresses the way hams send them: "KC0FSH AT PM DOT ME",
+   * "JSMITH ATSIGN GMAIL DOT COM", "AT SIGN". Rule of thumb: in the address (before the BT),
+   * AT or ATSIGN means an e-mail. It starts at the word before AT (plus any "X DOT" words ahead
+   * of that, as in "JOHN DOT SMITH AT ...") and runs to the end of the line. It is kept exactly
+   * as written, not converted to "@" form, because that's how it's read to other stations.
    */
-  const SPOKEN_EMAIL_RE = /(?:[A-Z0-9._%+\-]+\s+DOT\s+)*[A-Z0-9._%+\-]+\s*\bAT\s?SIGN\b\s*[A-Z0-9\-]+(?:(?:\s*\.\s*|\s+DOT\s+)[A-Z0-9\-]+)*/i;
+  const EMAIL_WORD_RE = /(?:^|\s)AT(?:\s?SIGN)?(?=\s|$)/i;
+  const SPOKEN_EMAIL_RE = /(?:^|\s)((?:(?:\S+\s+DOT\s+)*\S+\s+)?AT(?:\s?SIGN)?(?:\s.*)?)$/i;
+  function hasEmailWord(s) { return EMAIL_WORD_RE.test(String(s || '')); }
   function findSpokenEmail(s) {
-    const m = SPOKEN_EMAIL_RE.exec(String(s || ''));
-    return m ? { email: squash(m[0]).toUpperCase(), rest: squash(s.slice(0, m.index) + ' ' + s.slice(m.index + m[0].length)) } : null;
+    s = String(s || '');
+    if (!hasEmailWord(s)) return null;
+    const m = SPOKEN_EMAIL_RE.exec(s);
+    if (!m) return null;
+    const start = m.index + m[0].length - m[1].length;
+    return { email: squash(m[1]).toUpperCase(), rest: squash(s.slice(0, start)) };
   }
 
   function emptyAddress() {
@@ -190,12 +197,12 @@
 
   function parseAddressOneLine(line, a, warnings) {
     let s = line;
+    const ph = extractPhone(s);
+    if (ph) { a.phone = ph.phone; s = ph.rest; }
     const sp = findSpokenEmail(s);
     const em = /\S+@\S+/.exec(s);
     if (sp) { a.email = sp.email; s = sp.rest; }
     else if (em) { a.email = em[0].toLowerCase(); s = squash(s.replace(em[0], ' ')); }
-    const ph = extractPhone(s);
-    if (ph) { a.phone = ph.phone; s = ph.rest; }
     const toks = s.split(' ').filter(Boolean);
     let stateIdx = -1;
     for (let i = toks.length - 1; i >= 1; i--) {
@@ -238,8 +245,10 @@
 
     const rest = [];
     for (let l of lines) {
-      const sp = findSpokenEmail(l);
-      if (sp) {
+      if (hasEmailWord(l)) {
+        const lp = extractPhone(l);
+        if (lp) { a.phone = lp.phone; l = lp.rest; }
+        const sp = findSpokenEmail(l);
         a.email = sp.email;
         l = sp.rest.replace(/^E-?MAIL\b[:\s]*/, '');
         if (!l) continue;

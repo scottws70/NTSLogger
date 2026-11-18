@@ -495,7 +495,7 @@ function readMsgForm(root, base) {
   m.test = f('test').checked;
   m.to = {
     name: U('to.name'), street: String(v('to.street') || '').toUpperCase().split('\n').map(squash).filter(Boolean).join('\n'),
-    city: U('to.city'), state: U('to.state'), zip: squash(v('to.zip')), phone: squash(v('to.phone')), email: /\bAT\s?SIGN\b/i.test(v('to.email')) ? squash(v('to.email')).toUpperCase() : squash(v('to.email')).toLowerCase()
+    city: U('to.city'), state: U('to.state'), zip: squash(v('to.zip')), phone: squash(v('to.phone')), email: NTS.findSpokenEmail(v('to.email')) ? squash(v('to.email')).toUpperCase() : squash(v('to.email')).toLowerCase()
   };
   m.text = U('text');
   m.sig = String(v('sig') || '').toUpperCase().split('\n').map(squash).filter(Boolean).join('\n');
