@@ -579,7 +579,7 @@ function openView(id, bookIds) {
       <pre class="radiogram">${esc(shown)}</pre>
       <h3 style="margin:14px 0 4px">History</h3>${historyHtml(m)}`,
     foot: `<div class="left"><button class="btn danger" data-a="delete">Delete</button>${!waiting ? '<button class="btn" data-a="unclose">Return to waiting</button>' : ''}</div>
-      ${inBook ? '<button class="btn" data-a="whole">Whole message</button>' : ''}<button class="btn" data-a="copy">Copy</button><button class="btn" data-a="edit">Edit</button>
+      ${inBook ? '<button class="btn" data-a="whole">Whole message</button>' : ''}<button class="btn" data-a="copy">Copy</button><button class="btn" data-a="print" title="Print on the paper radiogram form, or save it as a PDF">Print…</button><button class="btn" data-a="edit">Edit</button>
       ${waiting ? '<button class="btn" data-a="service">Undeliverable…</button><button class="btn primary" data-a="relay">Relay…</button><button class="btn primary" data-a="deliver">Deliver…</button>' : ''}`
   });
   el.addEventListener('click', async e => {
@@ -594,6 +594,7 @@ function openView(id, bookIds) {
       return;
     }
     if (a === 'copy') return copyText(shown);
+    if (a === 'print') return RADIOGRAM.printRadiogram(m, S.settings);
     if (a === 'edit') { closeModal(el); return openEdit(id); }
     if (a === 'relay' || a === 'deliver' || a === 'service') { closeModal(el); return openDisposition(a, [id]); }
     if (a === 'unclose') {

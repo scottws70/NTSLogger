@@ -93,7 +93,13 @@ A form for one message: preamble, address, text, signature, and op note.
 
 ## Log
 
-Every message, newest activity first, with where it came in from and where it went. Filter by status (relayed, delivered, undeliverable, waiting), date range, or search for a callsign, name, city, net, or a word in the text. Click a message to view, copy, edit, or delete it, or to **Return to waiting** if something was logged by mistake. **Export CSV** saves the filtered list.
+Every message, newest activity first, with where it came in from and where it went. Filter by status (relayed, delivered, undeliverable, waiting), date range, or search for a callsign, name, city, net, or a word in the text. Click a message to view, copy, print, edit, or delete it, or to **Return to waiting** if something was logged by mistake. **Export CSV** saves the filtered list.
+
+### Printing a radiogram
+
+**Print…** in any message's window fills in the traditional paper radiogram form, on one landscape page, and opens the print dialog. To keep a copy on your computer instead, choose **Save as PDF** (Windows) or **Print to File** (Linux) there.
+
+The form shows the preamble, the address, the text five words to a row, and the signature. Under **REC'D** is the station you received the message from, with the date and time (UTC). If you relayed it, **SENT** shows the station you sent it to. "Received at" is filled in from My Station in Settings. The box in the bottom right holds the op note, the nets, and how it was delivered.
 
 ## Reports
 
@@ -108,6 +114,16 @@ Choose a period: today, yesterday, this week, this month, last month, this year,
 **Copy summary** puts a short text report on the clipboard for posting. **Export CSV** saves every event in the period.
 
 Whether "today" and the report periods run on **local days or UTC days** is set in Settings → Preferences.
+
+## Reference
+
+Two lists to have at hand while handling traffic:
+
+- **ARL Numbered Radiograms**: all ARL texts 1–99 (NTS 2.0, Rev. 2023-05-25), with how each is sent (`ARL FORTY SIX`) and what it means. Blanks show where a number or words are filled in. ARL FORTY ONE is marked **use with HXD**.
+- **Q Signals**: the QN signals for CW net use, with the meanings for net control only marked **NCS**, and the international Q signals.
+- **Radiogram Format**: what goes in each part of a radiogram, from the number to Rec'd; the HX handling instructions, with the most common (HXC, HXG) marked; and how to count the check.
+
+Type in **Search** to narrow the lists by signal, number, or any word. If the matches are all on another list, it switches to that list.
 
 ## Settings
 

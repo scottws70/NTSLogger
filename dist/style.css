@@ -358,3 +358,62 @@ pre.radiogram {
 .nets-table input, .nets-table select { width: 100%; }
 .days { display: flex; gap: 2px; }
 .days label { display: flex; flex-direction: column; align-items: center; font-size: 10px; color: var(--muted); gap: 1px; }
+
+/* ---------- reference ---------- */
+#ref-tabs { align-items: center; }
+#ref-tabs .spacer { flex: 1; }
+#ref-tabs input[type=search] { width: 200px; margin-bottom: 6px; }
+.ref-intro { margin: 0 0 10px; max-width: 80ch; line-height: 1.5; }
+table.ref-t td { line-height: 1.45; }
+table.ref-t td.ref-code { font-weight: 700; white-space: nowrap; color: var(--accent); }
+table.ref-t th.num, table.ref-t td.num { width: 3em; }
+table.ref-t tr.ref-reserved td { padding-top: 3px; padding-bottom: 3px; }
+table.ref-t td > div + div { margin-top: 2px; }
+table.ref-t td.ref-part { font-weight: 600; white-space: nowrap; }
+table.ref-t td.ref-nowrap { white-space: nowrap; }
+.ref-ex { font-size: .95em; }
+ul.ref-lines { margin: 4px 0 0; padding-left: 18px; }
+@media (max-width: 600px) { table.ref-t td.ref-part { white-space: normal; } }
+.ref-blank { display: inline-block; width: 3.2em; border-bottom: 1px solid currentColor; vertical-align: baseline; margin: 0 1px; opacity: .7; }
+@media (max-width: 600px) { #ref-tabs { flex-wrap: wrap; } #ref-tabs input[type=search] { width: 100%; } }
+
+/* ---------- paper radiogram (printing only) ---------- */
+#print-host { display: none; }
+@media print {
+  @page { size: letter landscape; margin: 0.35in; }
+  html, body { background: #fff !important; }
+  body > *:not(#print-host) { display: none !important; }
+  #print-host { display: block !important; }
+}
+.rg {
+  --rg-green: #c6e0b4; --rg-yellow: #ffe699; --rg-line: #333;
+  color: #000; font-family: Roboto, Arial, "Liberation Sans", Helvetica, sans-serif; font-size: 10pt;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  border: 1.5px solid var(--rg-line);
+}
+.rg-t { width: 100%; border-collapse: collapse; table-layout: fixed; background: var(--rg-yellow); }
+.rg-t td { border: 1px solid var(--rg-line); padding: 2px 6px; vertical-align: middle; overflow: hidden; text-align: center; }
+.rg-t + .rg-t td { border-top: 0; }
+.rg-t tr > td:first-child { border-left: 0; }
+.rg-t tr > td:last-child { border-right: 0; }
+.rg-head { background: var(--rg-green); }
+.rg-head td { border-top: 0; height: 0.95in; }
+.rg-l1 { font-size: 15pt; font-weight: 700; }
+.rg-l2 { font-size: 18pt; font-weight: 700; margin-top: 2px; }
+.rg-l3 { font-size: 8.5pt; font-weight: 700; margin-top: 2px; }
+.rg-lbl td, td.rg-lbl { font-size: 9pt; height: 0.26in; }
+.rg-val td { font-family: "DejaVu Sans Mono", Consolas, monospace; font-size: 10.5pt; font-weight: 700; height: 0.3in; }
+.rg-val td.rg-lbl { font-family: inherit; font-weight: 400; font-size: 11pt; }
+.rg-left { text-align: left !important; }
+.rg-right { text-align: right !important; vertical-align: bottom !important; }
+.rg-addr, .rg-at { text-align: left !important; vertical-align: top !important; height: 1.1in; padding: 6px 8px !important; }
+.rg-addr { font-family: "DejaVu Sans Mono", Consolas, monospace; font-weight: 700; font-size: 10.5pt; line-height: 1.35; }
+.rg-at { font-size: 10pt; line-height: 1.35; padding-top: 0.22in !important; }
+.rg-at span { display: inline-block; min-width: 1.15in; }
+.rg-text td { border-style: dotted; padding-top: 0; padding-bottom: 0; font-family: "DejaVu Sans Mono", Consolas, monospace; font-weight: 700; font-size: 10.5pt; }
+.rg-text tr:first-child td { border-top: 1px solid var(--rg-line); }
+.rg-text tr:last-child td { border-bottom: 1px solid var(--rg-line); }
+.rg-siglbl { font-size: 11pt !important; height: 0.36in !important; text-align: center; }
+.rg-sigval { text-align: left !important; font-family: "DejaVu Sans Mono", Consolas, monospace; font-weight: 700; font-size: 10.5pt; }
+.rg-free { text-align: left !important; vertical-align: top !important; font-size: 8.5pt; line-height: 1.3; height: 0.95in; }
+.rg-notes { text-align: left !important; vertical-align: top !important; font-size: 9pt; line-height: 1.35; }
