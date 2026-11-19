@@ -1,6 +1,6 @@
 [package]
 name = "N8VCL-NTS-Traffic-Logger"
-version = "1.4.1"
+version = "1.4.2"
 description = "Log, sort, book, relay and deliver NTS radiogram traffic"
 authors = ["N8VCL"]
 license = "MIT"
