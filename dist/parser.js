@@ -26,7 +26,18 @@
   const START_RE = new RegExp('^\\s*' + NRPFX + '(\\d{1,5})[\\s,]+(?:(TEST)\\s+)?' + PREC + '[\\s,]+' + HX + STATION + '[\\s,]+' + CHECK + '[\\s,]*(.*)$');
   // In a book header, precedence, HX and station of origin are optional: any of them may vary per message.
   const BOOK_PRE_RE = new RegExp('^\\s*(?:(TEST)\\s+)?(?:' + PREC + '[\\s,]+)?' + HX + '(?:' + STATION + '[\\s,]+)?' + CHECK + '[\\s,]*(.*)$');
-  const BOOK_RE = /^\s*BOOK\s+(?:OF\s+)?(\d{1,3})\b[\s,]*(.*)$/;
+  // The count may be spelled out: "BOOK OF TWO", "BOOK OF TWENTY ONE".
+  const NUM_WORDS = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5, SIX: 6, SEVEN: 7, EIGHT: 8, NINE: 9, TEN: 10,
+    ELEVEN: 11, TWELVE: 12, THIRTEEN: 13, FOURTEEN: 14, FIFTEEN: 15, SIXTEEN: 16, SEVENTEEN: 17, EIGHTEEN: 18, NINETEEN: 19,
+    TWENTY: 20, THIRTY: 30, FORTY: 40, FIFTY: 50 };
+  const TENS_W = 'TWENTY|THIRTY|FORTY|FIFTY';
+  const UNITS_W = 'ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE';
+  const COUNT_W = '(?:' + TENS_W + ')(?:[\\s-](?:' + UNITS_W + '))?|ELEVEN|TWELVE|THIRTEEN|FOURTEEN|FIFTEEN|SIXTEEN|SEVENTEEN|EIGHTEEN|NINETEEN|TEN|' + UNITS_W;
+  const BOOK_RE = new RegExp('^\\s*BOOK\\s+(?:OF\\s+)?(\\d{1,3}|' + COUNT_W + ')(?![A-Z0-9])[\\s,]*(.*)$');
+  function bookCount(w) {
+    if (/^\d+$/.test(w)) return parseInt(w, 10);
+    return w.split(/[\s-]+/).reduce((n, x) => n + (NUM_WORDS[x] || 0), 0);
+  }
   const VAR_RE = /^\s*(?:NR\.?|NUMBER:?|#)\s*(\d{1,5})\b[\s,]*(.*)$/;
   const END_LINE_RE = /^\s*(AR|NNNN|EOM|END|SK|AR\s+K|AR\s+SK|\+|#+|-{3,}|={3,}|\*{3,})\s*$/;
   const BT_SPLIT_RE = /(?:^|\s)BT(?=\s|$)/;
@@ -95,7 +106,7 @@
     t = t.replace(/<BT>/g, ' BT ');
     // Break run-together traffic onto separate lines before each "NR n prec" or "BOOK OF n"
     t = t.replace(/[ ]+(?=NR\.?\s?\d{1,5}[ ,]+(?:TEST\s+)?(?:EMERGENCY|EMERG|PRIORITY|ROUTINE|WELFARE|R|P|W|E)[ ,])/g, '\n');
-    t = t.replace(/[ ]+(?=BOOK\s+OF\s+\d)/g, '\n');
+    t = t.replace(new RegExp('[ ]+(?=BOOK\\s+OF\\s+(?:\\d|' + COUNT_W + ')(?![A-Z]))', 'g'), '\n');
     return t;
   }
 
@@ -414,7 +425,7 @@
 
   function parseBookBlock(lines) {
     const hm = BOOK_RE.exec(lines[0]);
-    const count = parseInt(hm[1], 10);
+    const count = bookCount(hm[1]);
     const base = blankMsg();
     const bookWarn = [];
     let remainder = '';
@@ -505,7 +516,7 @@
     let cur = null;
     for (const line of lines) {
       if (BOOK_RE.test(line)) {
-        cur = { kind: 'book', lines: [line], count: parseInt(BOOK_RE.exec(line)[1], 10), vars: 0, ended: false };
+        cur = { kind: 'book', lines: [line], count: bookCount(BOOK_RE.exec(line)[1]), vars: 0, ended: false };
         blocks.push(cur);
         continue;
       }
