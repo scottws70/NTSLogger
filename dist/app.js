@@ -580,7 +580,7 @@ function openView(id, bookIds) {
       <h3 style="margin:14px 0 4px">History</h3>${historyHtml(m)}`,
     foot: `<div class="left"><button class="btn danger" data-a="delete">Delete</button>${!waiting ? '<button class="btn" data-a="unclose">Return to waiting</button>' : ''}</div>
       ${inBook ? '<button class="btn" data-a="whole">Whole message</button>' : ''}<button class="btn" data-a="copy">Copy</button><button class="btn" data-a="print" title="Print on the paper radiogram form, or save it as a PDF">Print…</button><button class="btn" data-a="edit">Edit</button>
-      ${waiting ? '<button class="btn" data-a="service">Undeliverable…</button><button class="btn primary" data-a="relay">Relay…</button><button class="btn primary" data-a="deliver">Deliver…</button>' : ''}`
+      ${waiting ? '<button class="btn" data-a="service">Undeliverable…</button><button class="btn primary" data-a="relay"' + (air.to ? ' title="Log as relayed to ' + esc(air.to) + ' now">Relay → ' + esc(air.to) : '>Relay…') + '</button><button class="btn primary" data-a="deliver">Deliver…</button>' : ''}`
   });
   el.addEventListener('click', async e => {
     const b = e.target.closest('[data-a]');
@@ -596,7 +596,8 @@ function openView(id, bookIds) {
     if (a === 'copy') return copyText(shown);
     if (a === 'print') return RADIOGRAM.printRadiogram(m, S.settings);
     if (a === 'edit') { closeModal(el); return openEdit(id); }
-    if (a === 'relay' || a === 'deliver' || a === 'service') { closeModal(el); return openDisposition(a, [id]); }
+    if (a === 'relay') { closeModal(el); return quickRelay([id]); }
+    if (a === 'deliver' || a === 'service') { closeModal(el); return openDisposition(a, [id]); }
     if (a === 'unclose') {
       if (await askConfirm('Return to waiting', `Put NR ${esc(m.nr)} back on the waiting list? The ${m.status === 'relayed' ? 'relay' : 'delivery'} record will be cleared.`, 'Return to waiting')) {
         m.status = 'waiting'; m.disp = null; save(); closeModal(el); renderAll(); toast('Returned to waiting');
