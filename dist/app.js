@@ -1511,7 +1511,7 @@ function bindUpdates() {
   if (!(T && T.updater)) return;
   $('#update-check').classList.remove('hidden');
   $('#update-check').addEventListener('click', () => checkForUpdates(true));
-  setTimeout(() => checkForUpdates(false), 2000);
+  (window.splashDone || Promise.resolve()).then(() => setTimeout(() => checkForUpdates(false), 2000));
 }
 
 // =====================================================================
@@ -1654,12 +1654,15 @@ function init() {
   setInterval(renderClock, 1000);
   setInterval(() => { renderNets(); renderTiles(); renderAirBar(); }, 60000);
 
-  if (bootNotice) {
-    openModal({ title: esc(bootNotice.title), body: bootNotice.html, foot: '<button class="btn primary" data-close>OK</button>' });
-    if (!STORE_READY) showSaveFailed('Your changes are not being saved.');
-  } else if (!S.settings.call) {
-    toast('Welcome! Start in Settings with your callsign and nets.');
-  }
+  // Startup messages wait for the splash, so they aren't hidden behind it.
+  (window.splashDone || Promise.resolve()).then(() => {
+    if (bootNotice) {
+      openModal({ title: esc(bootNotice.title), body: bootNotice.html, foot: '<button class="btn primary" data-close>OK</button>' });
+      if (!STORE_READY) showSaveFailed('Your changes are not being saved.');
+    } else if (!S.settings.call) {
+      toast('Welcome! Start in Settings with your callsign and nets.');
+    }
+  });
 }
 
 document.addEventListener('DOMContentLoaded', async () => {

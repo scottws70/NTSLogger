@@ -7,6 +7,32 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div id="splash" hidden><img alt="N8VCL NTS Traffic Logger" src="splash.webp"></div>
+  <script>
+  /* Startup splash: once per app start (not on reloads in the same session). Fades after
+     3 seconds, or at once on a click or key press. */
+  window.splashDone = (function () {
+    const el = document.getElementById('splash');
+    let seen = false;
+    try { seen = sessionStorage.getItem('nts_splash') === '1'; sessionStorage.setItem('nts_splash', '1'); } catch (e) {}
+    if (seen) { el.remove(); return Promise.resolve(); }
+    el.hidden = false;
+    return new Promise(resolve => {
+      let done = false;
+      function close(e) {
+        if (e && e.type === 'keydown') { e.preventDefault(); e.stopPropagation(); } // the key only skips the splash
+        if (done) return;
+        done = true;
+        el.classList.add('gone');
+        document.removeEventListener('keydown', close, true);
+        setTimeout(() => { el.remove(); resolve(); }, 500);
+      }
+      setTimeout(close, 3000);
+      el.addEventListener('click', close);
+      document.addEventListener('keydown', close, true);
+    });
+  })();
+  </script>
   <div id="save-fail" class="hidden" role="alert"><span></span><button class="btn sm">Try again</button></div>
   <div id="update-bar" class="hidden" role="status">
     <span class="update-text" id="update-text"></span>
